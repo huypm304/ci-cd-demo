@@ -1,0 +1,63 @@
+// Jenkinsfile
+
+pipeline {
+    // 1. Chỉ định Jenkins chạy trên bất kỳ agent nào có sẵn
+    agent any
+
+    // 2. Định nghĩa các biến môi trường
+    environment {
+        // Thay 'pmh304' bằng username Docker Hub của bạn
+        DOCKERHUB_USERNAME = "pmh304"
+        // Thay 'my-python-app' bằng tên app bạn muốn
+        IMAGE_NAME = "my-python-app"
+    }
+
+    // 3. Định nghĩa các GIAI ĐOẠN (stages)
+    stages {
+        // Giai đoạn 1: Lấy code từ Git
+        stage('Git Clone') {
+            steps {
+                echo 'Đang lấy code...'
+                // Lệnh 'git' sẽ tự động chạy (Jenkins pipeline tự xử lý)
+            }
+        }
+
+        // Giai đoạn 2: Build Docker image
+        stage('Build Docker Image') {
+            steps {
+                echo 'Bắt đầu build image...'
+                // $BUILD_NUMBER là biến có sẵn của Jenkins (vd: 1, 2, 3...)
+                // Lệnh này sẽ chạy: docker build -t pmh304/my-python-app:1 .
+                sh "docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER} ."
+            }
+        }
+
+        // Giai đoạn 3: Đẩy image lên Docker Hub
+        stage('Push to Docker Hub') {
+            steps {
+                echo 'Đang đẩy image lên Docker Hub...'
+                
+                // Sử dụng credential 'dockerhub-creds' mà bạn đã tạo
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    
+                    // Lệnh 1: docker login
+                    sh "echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin"
+                    
+                    // Lệnh 2: docker push
+                    sh "docker push ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER}"
+                }
+            }
+        }
+    }
+    
+    // 4. Các bước luôn chạy sau cùng (dù thành công hay thất bại)
+    post {
+        always {
+            echo 'Hoàn thành pipeline. Dọn dẹp...'
+            // Đăng xuất khỏi Docker Hub
+            sh "docker logout"
+            // Xóa image vừa build khỏi máy Jenkins để tiết kiệm dung lượng
+            sh "docker rmi ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER}"
+        }
+    }
+}
