@@ -1,60 +1,45 @@
-// Jenkinsfile
-
 pipeline {
-    // 1. Chỉ định Jenkins chạy trên bất kỳ agent nào có sẵn
     agent any
-
-    // 2. Định nghĩa các biến môi trường
     environment {
         DOCKERHUB_USERNAME = "pmh304"
-        IMAGE_NAME = "my-python-app"
-        // Thêm biến này để dễ quản lý tên container
+        IMAGE_NAME = "app"
         CONTAINER_NAME = "my-flask-container" 
     }
-
-        // Giai đoạn 3: Đẩy image lên Docker Hub
+    stages {
+        stage('Build Docker Image') {
+            steps {
+                echo 'Starting image build...'
+                sh "docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER} ."
+            }
+        }
         stage('Push to Docker Hub') {
             steps {
-                echo 'Đang đẩy image lên Docker Hub...'
+                echo 'Pushing image to Docker Hub...'
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh "echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin"
                     sh "docker push ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER}"
                 }
             }
         }
-        
-        // GIAI ĐOẠN 4 (MỚI): Deploy ra chính máy Host
         stage('Deploy to Host') {
             steps {
-                echo 'Bắt đầu Deploy (triển khai)...'
-                
-                // 1. Dừng container cũ (nếu có)
-                // '|| true' để lệnh không bị lỗi nếu container chưa tồn tại
+                echo 'Starting deployment...'
                 sh "docker stop ${CONTAINER_NAME} || true"
-                
-                // 2. Xóa container cũ (nếu có)
                 sh "docker rm ${CONTAINER_NAME} || true"
-                
-                echo "Đang chạy image: ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER}"
-                
-                // 3. Chạy container mới
-                // Chúng ta dùng cổng 5000:5000 cho nhất quán
+                echo "Running image: ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER}"
                 sh "docker run -d -p 5000:5000 --name ${CONTAINER_NAME} ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER}"
             }
         }
     }
-    
-    // 4. Các bước chạy sau cùng
     post {
-        // Luôn luôn chạy, dù thành công hay thất bại
         always {
-            echo 'Hoàn thành pipeline. Đăng xuất Docker...'
+            echo 'Pipeline finished. Logging out of Docker...'
             sh "docker logout"
         }
-        // Chỉ chạy khi pipeline THÀNH CÔNG
         success {
-            echo 'Pipeline thành công. Dọn dẹp images rác...'
-            // Lệnh này sẽ xóa các image cũ, không còn được dùng
+            echo 'Pipeline successful. Cleaning up unused images...'
             sh "docker image prune -f"
         }
     }
+}
+
