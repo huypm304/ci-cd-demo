@@ -1,2 +1,5 @@
 # requirements.txt
 Flask
+pytest
+flake8
+pytest

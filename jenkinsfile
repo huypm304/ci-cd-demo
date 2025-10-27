@@ -2,22 +2,39 @@ pipeline {
     agent any
     environment {
         DOCKERHUB_USERNAME = "pmh304"
-        IMAGE_NAME = "app"
+
+        IMAGE_NAME = "app" 
         CONTAINER_NAME = "my-flask-container" 
     }
     stages {
+
+        stage('Run Tests') {
+            agent {
+           
+                docker {
+           
+                    image 'python:3.11-slim' 
+    
+                    args '-v $PWD:$PWD -w $PWD' 
+                }
+            }
+            steps {
+                echo 'Installing test dependencies...'
+        
+                sh 'pip install -r requirements.txt' 
+                echo 'Running unit tests...'
+   
+                sh 'pytest --maxfail=1 --disable-warnings -q' 
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
                 echo 'Starting image build...'
-                sh "docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER} ."
+ 
+                sh "docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER} ." 
             }
         }
-        stage('Run Tests') {
-            steps {
-                echo 'Running unit tests...'
-                sh 'pytest --maxfail=1 --disable-warnings -q'
-            }
-    }
 
         stage('Push to Docker Hub') {
             steps {
@@ -28,16 +45,17 @@ pipeline {
                 }
             }
         }
+
         stage('Deploy to Host') {
             steps {
                 echo 'Starting deployment...'
                 sh "docker stop ${CONTAINER_NAME} || true"
                 sh "docker rm ${CONTAINER_NAME} || true"
-                echo "Running image: ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER}"
                 sh "docker run -d -p 5000:5000 --name ${CONTAINER_NAME} ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER}"
             }
         }
     }
+
     post {
         always {
             echo 'Pipeline finished. Logging out of Docker...'
@@ -46,7 +64,11 @@ pipeline {
         success {
             echo 'Pipeline successful. Cleaning up unused images...'
             sh "docker image prune -f"
+            slackSend channel: '#devops', message: "Build #${BUILD_NUMBER} succeeded!"
+        }
+        failure {
+            echo 'Pipeline failed.'
+            slackSend channel: '#devops', message: "Build #${BUILD_NUMBER} failed!"
         }
     }
 }
-

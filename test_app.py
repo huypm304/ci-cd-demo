@@ -1,7 +1,7 @@
 from app import app
 
-def testapp():
-    client = app.test_client
+def test_app():
+    client = app.test_client() 
     response = client.get('/')
     assert response.status_code == 200
-    assert "Hello World!" in response.data.decode()
+    assert response.data.decode() == 'Hello World! ' 
