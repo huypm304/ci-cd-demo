@@ -12,24 +12,6 @@ pipeline {
         CONTAINER_NAME = "my-flask-container" 
     }
 
-    // 3. Định nghĩa các GIAI ĐOẠN (stages)
-    stages {
-        // Giai đoạn 1: Lấy code từ Git
-        stage('Git Clone') {
-            steps {
-                echo 'Đang lấy code...'
-                git 'https://github.com/huypm304/ci-cd-demo.git'
-            }
-        }
-
-        // Giai đoạn 2: Build Docker image
-        stage('Build Docker Image') {
-            steps {
-                echo 'Bắt đầu build image...'
-                sh "docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER} ."
-            }
-        }
-
         // Giai đoạn 3: Đẩy image lên Docker Hub
         stage('Push to Docker Hub') {
             steps {
@@ -76,4 +58,3 @@ pipeline {
             sh "docker image prune -f"
         }
     }
-}
