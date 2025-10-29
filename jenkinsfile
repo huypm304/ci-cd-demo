@@ -4,7 +4,7 @@ pipeline {
     environment {
         DOCKERHUB_USERNAME = "pmh304"
         IMAGE_NAME = "app" 
-        DEPLOY_PATH = "${WORKSPACE}"
+        DEPLOY_PATH = "${WORKSPACE}" 
     }
     
 
@@ -13,13 +13,11 @@ pipeline {
              agent { 
                 docker {
                     image 'python:3.11-slim' 
-
                     args '-u root -v $PWD:$PWD -w $PWD' 
                 }
             }
             steps {
                 echo 'Installing test dependencies...'
-
                 sh 'pip install --no-cache-dir -r requirements.txt' 
                 echo 'Running unit tests...'
                 sh 'pytest --maxfail=1 --disable-warnings -q' 
@@ -29,6 +27,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 echo 'Starting image build...'
+                // Build both :BUILD_NUMBER and :latest tags
                 sh "docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER} -t ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest ." 
             }
         }
@@ -39,6 +38,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh "echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin"
                     sh "docker push ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER}"
+                    // Push the :latest tag as well
                     sh "docker push ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest" 
                 }
             }
@@ -48,12 +48,12 @@ pipeline {
         stage('Deploy via Docker Compose') { 
             steps {
                 echo 'Starting deployment using Docker Compose...'
-               
+
                 sh """
                     cd ${DEPLOY_PATH} && \\
-                    docker-compose down --remove-orphans && \\
-                    docker-compose pull web && \\
-                    docker-compose up -d --force-recreate web 
+                    docker compose down --remove-orphans && \\
+                    docker compose pull web && \\
+                    docker compose up -d --force-recreate web 
                 """
             }
         }
@@ -64,7 +64,7 @@ pipeline {
         always {
             echo 'Pipeline finished. Logging out of Docker...'
             script {
-        
+                // Added check and try-catch for logout robustness
                 if (currentBuild.result == null || currentBuild.result == 'SUCCESS' || currentBuild.result == 'UNSTABLE') {
                     try { 
                          sh "docker logout"
@@ -85,3 +85,4 @@ pipeline {
         } 
     }
 }
+
