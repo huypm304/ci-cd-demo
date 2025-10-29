@@ -4,23 +4,30 @@ pipeline {
     environment {
         DOCKERHUB_USERNAME = "pmh304"
         IMAGE_NAME = "app" 
-        CONTAINER_NAME = "my-flask-container" 
+        DEPLOY_PATH = "/media/mhuy/Data/study/Projects/CI-CD-web-app" /
     }
     
     stages {
         stage('Run Tests') {
+             agent { 
+                docker {
+                    image 'python:3.11-slim' 
+           
+                    args '-u root -v $PWD:$PWD -w $PWD' 
+                }
+            }
             steps {
                 echo 'Installing test dependencies...'
-                sh 'pip3 install --user --no-cache-dir -r requirements.txt' 
+                sh 'pip install --no-cache-dir -r requirements.txt' 
                 echo 'Running unit tests...'
-                sh 'export PATH=$HOME/.local/bin:$PATH && pytest --maxfail=1 --disable-warnings -q' 
+                sh 'pytest --maxfail=1 --disable-warnings -q' 
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 echo 'Starting image build...'
-                sh "docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER} ." 
+                sh "docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER} -t ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest ." 
             }
         }
 
@@ -30,17 +37,21 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh "echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin"
                     sh "docker push ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER}"
+                    sh "docker push ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest" 
                 }
             }
         }
 
-        stage('Deploy to Host') {
+     
+        stage('Deploy via Docker Compose') { 
             steps {
-                echo 'Starting deployment...'
-                sh "docker stop ${CONTAINER_NAME} || true"
-                sh "docker rm ${CONTAINER_NAME} || true"
-                echo "Running image from Docker Hub: ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER}" 
-                sh "docker run -d -p 5000:5000 --name ${CONTAINER_NAME} ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER}" 
+                echo 'Starting deployment using Docker Compose...'
+   
+                sh """
+                    cd ${DEPLOY_PATH} && \\
+                    docker-compose pull web && \\
+                    docker-compose up -d --force-recreate web 
+                """
             }
         }
     }
@@ -49,6 +60,7 @@ pipeline {
         always {
             echo 'Pipeline finished. Logging out of Docker...'
             script {
+
                 if (currentBuild.result == null || currentBuild.result == 'SUCCESS' || currentBuild.result == 'UNSTABLE') {
                     try { 
                          sh "docker logout"
