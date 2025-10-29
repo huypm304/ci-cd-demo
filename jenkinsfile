@@ -4,20 +4,22 @@ pipeline {
     environment {
         DOCKERHUB_USERNAME = "pmh304"
         IMAGE_NAME = "app" 
-        DEPLOY_PATH = "/media/mhuy/Data/study/Projects/CI-CD-web-app" /
+        DEPLOY_PATH = "/media/mhuy/Data/study/Projects/CI-CD-web-app" 
     }
     
-    stages {
+
+    stages { 
         stage('Run Tests') {
              agent { 
                 docker {
                     image 'python:3.11-slim' 
-           
+
                     args '-u root -v $PWD:$PWD -w $PWD' 
                 }
             }
             steps {
                 echo 'Installing test dependencies...'
+
                 sh 'pip install --no-cache-dir -r requirements.txt' 
                 echo 'Running unit tests...'
                 sh 'pytest --maxfail=1 --disable-warnings -q' 
@@ -46,7 +48,7 @@ pipeline {
         stage('Deploy via Docker Compose') { 
             steps {
                 echo 'Starting deployment using Docker Compose...'
-   
+               
                 sh """
                     cd ${DEPLOY_PATH} && \\
                     docker-compose pull web && \\
@@ -54,13 +56,14 @@ pipeline {
                 """
             }
         }
-    }
+  
+    } 
 
     post {
         always {
             echo 'Pipeline finished. Logging out of Docker...'
             script {
-
+        
                 if (currentBuild.result == null || currentBuild.result == 'SUCCESS' || currentBuild.result == 'UNSTABLE') {
                     try { 
                          sh "docker logout"
@@ -81,4 +84,3 @@ pipeline {
         } 
     }
 }
-
