@@ -44,13 +44,14 @@ pipeline {
             }
         }
 
-     
+        
         stage('Deploy via Docker Compose') { 
             steps {
                 echo 'Starting deployment using Docker Compose...'
                
                 sh """
                     cd ${DEPLOY_PATH} && \\
+                    docker-compose down --remove-orphans && \\
                     docker-compose pull web && \\
                     docker-compose up -d --force-recreate web 
                 """
