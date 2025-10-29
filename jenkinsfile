@@ -1,23 +1,19 @@
 pipeline {
-    agent any
+    agent any 
+    
     environment {
         DOCKERHUB_USERNAME = "pmh304"
         IMAGE_NAME = "app" 
         CONTAINER_NAME = "my-flask-container" 
     }
+    
     stages {
         stage('Run Tests') {
-            agent {
-                docker {
-                    image 'python:3.11-slim' 
-                    args '-u root -v $PWD:$PWD -w $PWD' 
-                }
-            }
             steps {
                 echo 'Installing test dependencies...'
-                sh 'pip install --no-cache-dir -r requirements.txt' 
+                sh 'pip3 install --user --no-cache-dir -r requirements.txt' 
                 echo 'Running unit tests...'
-                sh 'pytest --maxfail=1 --disable-warnings -q' 
+                sh 'export PATH=$HOME/.local/bin:$PATH && pytest --maxfail=1 --disable-warnings -q' 
             }
         }
 
@@ -47,7 +43,7 @@ pipeline {
                 sh "docker run -d -p 5000:5000 --name ${CONTAINER_NAME} ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER}" 
             }
         }
-    }  ''
+    }
 
     post {
         always {
@@ -71,6 +67,6 @@ pipeline {
         failure {
             echo 'Pipeline failed.'
         } 
-    } 
-} 
+    }
+}
 
