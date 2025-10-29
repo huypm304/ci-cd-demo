@@ -4,7 +4,7 @@ pipeline {
     environment {
         DOCKERHUB_USERNAME = "pmh304"
         IMAGE_NAME = "app" 
-        DEPLOY_PATH = "/media/mhuy/Data/study/Projects/CI-CD-web-app" 
+        DEPLOY_PATH = "${WORKSPACE}"
     }
     
 
