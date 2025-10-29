@@ -5,11 +5,11 @@ pipeline {
         IMAGE_NAME = "app" 
         CONTAINER_NAME = "my-flask-container" 
     }
-      stage('Run Tests') {
+    stages {
+        stage('Run Tests') {
             agent {
                 docker {
                     image 'python:3.11-slim' 
-
                     args '-u root -v $PWD:$PWD -w $PWD' 
                 }
             }
@@ -20,7 +20,6 @@ pipeline {
                 sh 'pytest --maxfail=1 --disable-warnings -q' 
             }
         }
-
 
         stage('Build Docker Image') {
             steps {
@@ -48,7 +47,7 @@ pipeline {
                 sh "docker run -d -p 5000:5000 --name ${CONTAINER_NAME} ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER}" 
             }
         }
-    }
+    }  ''
 
     post {
         always {
@@ -63,14 +62,15 @@ pipeline {
                 } else {
                      echo "Skipping docker logout due to earlier failure."
                 }
-            }
-        }
+            } 
+        } 
         success {
             echo 'Pipeline successful. Cleaning up unused images...'
             sh "docker image prune -f"
-        }
+        } 
         failure {
             echo 'Pipeline failed.'
-        }
-    }
-}
+        } 
+    } 
+} 
+
