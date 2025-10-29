@@ -5,23 +5,22 @@ pipeline {
         IMAGE_NAME = "app" 
         CONTAINER_NAME = "my-flask-container" 
     }
-    stages {
-        stage('Run Tests') {
+      stage('Run Tests') {
             agent {
                 docker {
                     image 'python:3.11-slim' 
-                    user: 'root' 
-                    args '-v $PWD:$PWD -w $PWD' 
+
+                    args '-u root -v $PWD:$PWD -w $PWD' 
                 }
             }
             steps {
                 echo 'Installing test dependencies...'
-
                 sh 'pip install --no-cache-dir -r requirements.txt' 
                 echo 'Running unit tests...'
                 sh 'pytest --maxfail=1 --disable-warnings -q' 
             }
         }
+
 
         stage('Build Docker Image') {
             steps {
