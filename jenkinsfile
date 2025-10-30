@@ -4,10 +4,13 @@ pipeline {
     environment {
         DOCKERHUB_USERNAME = "pmh304"
         IMAGE_NAME = "app" 
-        DEPLOY_PATH = "${WORKSPACE}" 
+    
+        DEPLOY_SERVER_IP = "172.31.46.126" 
+        
+        DEPLOY_SERVER_USER = "ubuntu" 
+        DEPLOY_APP_PATH = "/home/ubuntu/app-deploy" 
     }
     
-
     stages { 
         stage('Run Tests') {
              agent { 
@@ -27,7 +30,6 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 echo 'Starting image build...'
-                // Build both :BUILD_NUMBER and :latest tags
                 sh "docker build -t ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER} -t ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest ." 
             }
         }
@@ -38,33 +40,50 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh "echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin"
                     sh "docker push ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${BUILD_NUMBER}"
-                    // Push the :latest tag as well
                     sh "docker push ${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest" 
                 }
             }
         }
 
-        
-        stage('Deploy via Docker Compose') { 
+        stage('Deploy to Remote Server via SSH') { 
             steps {
-                echo 'Starting deployment using Docker Compose...'
+                echo "Deploying to ${DEPLOY_SERVER_USER}@${DEPLOY_SERVER_IP}..."
+                
+    
+                sshagent(credentials: ['jenkins-localhost-ssh']) {
+                    
 
-                sh """
-                    cd ${DEPLOY_PATH} && \\
-                    docker compose down --remove-orphans && \\
-                    docker compose pull web && \\
-                    docker compose up -d --force-recreate web 
-                """
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${DEPLOY_SERVER_USER}@${DEPLOY_SERVER_IP} '''
+                            echo "--- Connected to Deploy Server ---"
+                            
+                            mkdir -p ${DEPLOY_APP_PATH}
+                            cd ${DEPLOY_APP_PATH}
+                            
+                            if [ -d ".git" ]; then
+                                echo "Git repo exists. Pulling latest code..."
+                                git pull
+                            else
+                                echo "Git repo not found. Cloning..."
+                                git clone https://github.com/huypm304/ci-cd-demo.git .
+                            fi
+                            
+                            echo "Pulling latest image and restarting service..."
+                            docker compose down --remove-orphans
+                            docker compose pull web
+                            docker compose up -d --force-recreate web
+                            echo "--- Deployment finished ---"
+                        '''
+                    """
+                }
             }
         }
-  
     } 
 
     post {
         always {
             echo 'Pipeline finished. Logging out of Docker...'
             script {
-                // Added check and try-catch for logout robustness
                 if (currentBuild.result == null || currentBuild.result == 'SUCCESS' || currentBuild.result == 'UNSTABLE') {
                     try { 
                          sh "docker logout"
